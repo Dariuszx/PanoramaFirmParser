@@ -10,6 +10,7 @@ import pl.parser.dao.Company;
 import pl.parser.dao.Subpage;
 
 import java.io.IOException;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
@@ -92,15 +93,28 @@ public class CompanyParser {
         return this;
     }
 
-    public void fillAddressFields() throws SQLException {
+    public void fillAddressFields() throws SQLException, IOException {
 
         if (Main.SHOW_STEPS) {
             System.out.println("- pobieram adresy dla sparsowanych firm");
         }
 
         Database database = new Database();
-        String sql = "SELECT " +
-                "";
+        String sql = "SELECT * FROM company WHERE address_id is NULL";
+        ResultSet result = database.selectStatement(sql);
+
+        while (result.next()) {
+            int company_id = result.getInt("company_id");
+            String pf_website = result.getString("pf_website");
+
+            Document document = Jsoup.connect(pf_website).get();
+            Element element = getFirstElement(this.getFirstElement(document.select(".additionalData div")).select("p:last-child"));
+            String adres = element.text();
+
+
+
+            System.out.println(company_id + " " + pf_website);
+        }
 
         database.close();
 
