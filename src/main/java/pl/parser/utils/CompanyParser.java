@@ -11,6 +11,7 @@ import pl.parser.dao.Company;
 import pl.parser.dao.Subpage;
 
 import java.io.IOException;
+import java.net.SocketTimeoutException;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -37,9 +38,21 @@ public class CompanyParser {
         Document document;
         int parsedCompanies = 0;
 
-        for (Subpage subpage : subpages) {
+        for (int j=0; j < subpages.size(); j++) {
+
+            Subpage subpage = subpages.get(j);
+            Thread.sleep(Main.SLEEP_TIME);
             String url = subpage.getLinkParsed(subpage.getPageNumber());
-            document = Jsoup.connect(url).get();
+            try {
+                document = Jsoup.connect(url).get();
+            } catch (SocketTimeoutException e) {
+                if(Main.SHOW_STEPS) {
+                    System.out.println("!- SocketSystemTimeOutException, ponawiam próbe pobrania" +
+                            " strony " + url);
+                }
+                j--;
+                continue;
+            }
             Elements companyDiv = document.select("#serpContent .card");
             Database database = new Database();
 
@@ -53,7 +66,7 @@ public class CompanyParser {
                 String phone_number;
                 String email;
 
-                Element titleEl = this.getFirstElement(companyEl.select(".title .companyName"));
+                Element titleEl = this.getFirstElement(companyEl.select(".title h2 a"));
                 if (titleEl != null) {
                     name = titleEl.text().trim();
                     pf_website = titleEl.attr("href");
@@ -96,7 +109,7 @@ public class CompanyParser {
         return this;
     }
 
-    public void fillAddressFields() throws SQLException, IOException {
+    public void fillAddressFields() throws SQLException, IOException, InterruptedException {
 
         if (Main.SHOW_STEPS) {
             System.out.println("- pobieram adresy dla sparsowanych firm");
@@ -108,10 +121,21 @@ public class CompanyParser {
         ResultSet result = database.selectStatement(sql);
 
         while (result.next()) {
+            Thread.sleep(Main.SLEEP_TIME);
             int company_id = result.getInt("company_id");
             String pf_website = result.getString("pf_website");
+            Document document;
+            try {
+                document = Jsoup.connect(pf_website).get();
+            } catch (SocketTimeoutException e) {
+                if(Main.SHOW_STEPS) {
+                    System.out.println("!- SocketSystemTimeOutException, ponawiam próbe pobrania" +
+                            " strony " + pf_website);
+                }
+                result.previous();
+                continue;
+            }
 
-            Document document = Jsoup.connect(pf_website).get();
             Element element = getFirstElement(this.getFirstElement(document.select(".additionalData div")).select("p:last-child"));
 
             if(element.childNodes().size() == 5) {
