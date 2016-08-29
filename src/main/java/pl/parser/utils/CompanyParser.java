@@ -6,6 +6,7 @@ import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 import pl.parser.Main;
+import pl.parser.dao.Address;
 import pl.parser.dao.Company;
 import pl.parser.dao.Subpage;
 
@@ -14,6 +15,8 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class CompanyParser {
 
@@ -99,6 +102,7 @@ public class CompanyParser {
             System.out.println("- pobieram adresy dla sparsowanych firm");
         }
 
+        int index = 0;
         Database database = new Database();
         String sql = "SELECT * FROM company WHERE address_id is NULL";
         ResultSet result = database.selectStatement(sql);
@@ -109,17 +113,39 @@ public class CompanyParser {
 
             Document document = Jsoup.connect(pf_website).get();
             Element element = getFirstElement(this.getFirstElement(document.select(".additionalData div")).select("p:last-child"));
-            String adres = element.text();
 
+            if(element.childNodes().size() == 5) {
 
+                Address address = new Address();
 
-            System.out.println(company_id + " " + pf_website);
+                String street = element.childNode(0).toString();
+                String postalCode_City = element.childNode(2).toString();
+                String province = element.childNode(4).toString().replace("woj.", "");
+                String postalCode = "";
+                String city = "";
+
+                String pattern = "[0-9]{2}-[0-9]{3}";
+                Pattern p = Pattern.compile(pattern);
+
+                Matcher matcher = p.matcher(postalCode_City);
+                if(matcher.find()) {
+                    postalCode = matcher.group(0);
+                    city = postalCode_City.replace(postalCode, "");
+                }
+
+                address.setProvince(province);
+                address.setCity(city);
+                address.setPostalCode(postalCode);
+                address.setStreet(street);
+
+                address.insertIntoDatabase(database, company_id);
+
+                if (Main.SHOW_STEPS) System.out.println("\t - pobieram adres dla firmy o ID w bazie: " + company_id);
+            }
+            index++;
         }
-
         database.close();
-
-        System.out.println();
-
+        if (Main.SHOW_STEPS) System.out.println("- pobrano " + index + " adresow firm");
     }
 
     private Element getFirstElement(Elements elements) {
